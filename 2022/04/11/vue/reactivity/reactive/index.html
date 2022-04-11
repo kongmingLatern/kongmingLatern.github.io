@@ -1,0 +1,214 @@
+
+<!DOCTYPE html>
+<html lang="en" class="loading">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vue3 源码解读 -- reactive - Syjの日常博客</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="google" content="notranslate" />
+    <meta name="keywords" content="mowind,"> 
+    <meta name="description" content="啦啦啦,Reactive 依赖收集思路Reactive APIcreateReactiveObject ： 创建 reactive 对象
+
+函数首先判断 target 是否是一个数组 或者 对象类型，如果不,"> 
+    <meta name="author" content="syj"> 
+    <link rel="alternative" href="atom.xml" title="Syjの日常博客" type="application/atom+xml"> 
+    <link rel="icon" href="/img/favicon.png"> 
+    
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+
+    
+    
+    <meta name="twitter:card" content="summary"/>
+    <meta name="twitter:title" content="Vue3 源码解读 -- reactive - Syjの日常博客"/>
+    <meta name="twitter:description" content="啦啦啦,Reactive 依赖收集思路Reactive APIcreateReactiveObject ： 创建 reactive 对象
+
+函数首先判断 target 是否是一个数组 或者 对象类型，如果不,"/>
+    
+    
+    
+    
+    <meta property="og:site_name" content="Syjの日常博客"/>
+    <meta property="og:type" content="object"/>
+    <meta property="og:title" content="Vue3 源码解读 -- reactive - Syjの日常博客"/>
+    <meta property="og:description" content="啦啦啦,Reactive 依赖收集思路Reactive APIcreateReactiveObject ： 创建 reactive 对象
+
+函数首先判断 target 是否是一个数组 或者 对象类型，如果不,"/>
+    
+<link rel="stylesheet" href="/css/diaspora.css">
+
+<meta name="generator" content="Hexo 6.1.0"></head>
+
+<body class="loading">
+    <span id="config-title" style="display:none">Syjの日常博客</span>
+    <div id="loader"></div>
+    <div id="single">
+    <div id="top" style="display: block;">
+    <div class="bar" style="width: 0;"></div>
+    <a class="iconfont icon-home image-icon" href="javascript:;" data-url="http://example.com"></a>
+    <div title="播放/暂停" class="iconfont icon-play"></div>
+    <h3 class="subtitle">Vue3 源码解读 -- reactive</h3>
+    <div class="social">
+        <div>
+            <div class="share">
+                <a title="获取二维码" class="iconfont icon-scan" href="javascript:;"></a>
+            </div>
+            <div id="qr"></div>
+        </div>
+    </div>
+    <div class="scrollbar"></div>
+</div>
+
+    <div class="section">
+        <div class="article">
+    <div class='main'>
+        <h1 class="title">Vue3 源码解读 -- reactive</h1>
+        <div class="stuff">
+            <span>四月 11, 2022</span>
+            
+
+        </div>
+        <div class="content markdown">
+            <h1 id="Reactive-依赖收集思路"><a href="#Reactive-依赖收集思路" class="headerlink" title="Reactive 依赖收集思路"></a>Reactive 依赖收集思路</h1><h2 id="Reactive-API"><a href="#Reactive-API" class="headerlink" title="Reactive API"></a>Reactive API</h2><p><code>createReactiveObject</code> ： 创建 <code>reactive</code> 对象</p>
+<blockquote>
+<p>函数首先判断 <code>target</code> 是否是一个<code>数组</code> 或者 <code>对象</code>类型，如果不是直接返回。<br>原始数据 <code>target</code> 必须是<code>数组</code> 或者 <code>对象</code><br>对于一个<strong>已经是响应式</strong>的对象，再次执行后<strong>仍旧应该是一个响应式对象</strong></p>
+</blockquote>
+<h2 id="reactive-的底层实现"><a href="#reactive-的底层实现" class="headerlink" title="reactive 的底层实现"></a>reactive 的底层实现</h2><p>使用 <code>TypeScript</code> 实现 reactive [基本流程]</p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">reactive</span>(<span class="params">raw</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">Proxy</span>(&#123;&#125;, &#123;</span><br><span class="line">    <span class="title function_">get</span>(<span class="params">target, key</span>) &#123;</span><br><span class="line">      <span class="comment">// 返回该对象的属性值</span></span><br><span class="line">      <span class="keyword">const</span> res = <span class="title class_">Reflect</span>.<span class="title function_">get</span>(target, key)</span><br><span class="line">      <span class="comment">// 如果获取到的对象依旧是一个对象，那么给他的内部继续包裹 reactive</span></span><br><span class="line">      <span class="keyword">if</span> (<span class="title function_">isObject</span>(res)) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="title function_">reactive</span>(res)</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="comment">// 收集依赖，具体收集可以查看 effect.md</span></span><br><span class="line">      <span class="title function_">track</span>(target, key)</span><br><span class="line"></span><br><span class="line">      <span class="keyword">return</span> res</span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="title function_">set</span>(<span class="params">target, key, value</span>) &#123;</span><br><span class="line">      <span class="comment">// 更改指定 key 的值</span></span><br><span class="line">      <span class="keyword">const</span> <span class="attr">res</span>: <span class="built_in">boolean</span> = <span class="title class_">Reflect</span>.<span class="title function_">set</span>(target, key, value)</span><br><span class="line">      <span class="comment">// 触发依赖</span></span><br><span class="line">      <span class="title function_">trigger</span>(target, key)</span><br><span class="line"></span><br><span class="line">      <span class="keyword">return</span> res</span><br><span class="line">    &#125;,</span><br><span class="line">  &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+            <!--[if lt IE 9]><script>document.createElement('audio');</script><![endif]-->
+            <audio id="audio" loop="1" preload="auto" controls="controls" data-autoplay="false">
+                <source type="audio/mpeg" src="">
+            </audio>
+            
+                <ul id="audio-list" style="display:none">
+                    
+                        
+                            <li title="0" data-url="http://link.hhtjim.com/163/425570952.mp3"></li>
+                        
+                    
+                        
+                            <li title="1" data-url="http://link.hhtjim.com/163/425570952.mp3"></li>
+                        
+                    
+                </ul>
+            
+        </div>
+        
+    <div id="gitalk-container" class="comment link"
+		data-enable="true"
+        data-ae="false"
+        data-ci=""
+        data-cs=""
+        data-r=""
+        data-o="kongmingLatern"
+        data-a="kongmingLatern"
+        data-d="false"
+    >查看评论</div>
+
+
+    </div>
+    
+        <div class="side">
+			<ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#Reactive-%E4%BE%9D%E8%B5%96%E6%94%B6%E9%9B%86%E6%80%9D%E8%B7%AF"><span class="toc-number">1.</span> <span class="toc-text">Reactive 依赖收集思路</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#Reactive-API"><span class="toc-number">1.1.</span> <span class="toc-text">Reactive API</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#reactive-%E7%9A%84%E5%BA%95%E5%B1%82%E5%AE%9E%E7%8E%B0"><span class="toc-number">1.2.</span> <span class="toc-text">reactive 的底层实现</span></a></li></ol></li></ol>	
+        </div>
+    
+</div>
+
+
+    </div>
+</div>
+</body>
+
+<script src="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+
+
+<script src="//lib.baomitu.com/jquery/1.8.3/jquery.min.js"></script>
+<script src="/js/plugin.js"></script>
+<script src="/js/typed.js"></script>
+<script src="/js/diaspora.js"></script>
+
+
+<link rel="stylesheet" href="/photoswipe/photoswipe.css">
+<link rel="stylesheet" href="/photoswipe/default-skin/default-skin.css">
+
+
+<script src="/photoswipe/photoswipe.min.js"></script>
+<script src="/photoswipe/photoswipe-ui-default.min.js"></script>
+
+
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+    <!-- Background of PhotoSwipe. 
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+        <!-- Container that holds slides. 
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+            <div class="pswp__top-bar">
+                <!--  Controls are self-explanatory. Order can be changed. -->
+                <div class="pswp__counter"></div>
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+                <!-- Preloader demo http://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div> 
+            </div>
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({"HTML-CSS": { preferredFont: "TeX", availableFonts: ["STIX","TeX"], linebreaks: { automatic:true }, EqnChunk: (MathJax.Hub.Browser.isMobile ? 10 : 50) },
+        tex2jax: { inlineMath: [ ["$", "$"], ["\\(","\\)"] ], processEscapes: true, ignoreClass: "tex2jax_ignore|dno",skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']},
+        TeX: {  noUndefined: { attributes: { mathcolor: "red", mathbackground: "#FFEEEE", mathsize: "90%" } }, Macros: { href: "{}" } },
+        messageStyle: "none"
+    });
+</script>
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+
+
+</html>

@@ -1,0 +1,245 @@
+
+<!DOCTYPE html>
+<html lang="en" class="loading">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vue3 源码解读 -- 响应式 - Syjの日常博客</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="google" content="notranslate" />
+    <meta name="keywords" content="mowind,"> 
+    <meta name="description" content="啦啦啦,响应式 设计思路vue2 的响应式处理在了解 vue3 的响应式之前，需要了解下 vue2 是如何实现响应式的：vue2 通过Object.defineProperty API来实现数据的响应式但是,"> 
+    <meta name="author" content="syj"> 
+    <link rel="alternative" href="atom.xml" title="Syjの日常博客" type="application/atom+xml"> 
+    <link rel="icon" href="/img/favicon.png"> 
+    
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+
+    
+    
+    <meta name="twitter:card" content="summary"/>
+    <meta name="twitter:title" content="Vue3 源码解读 -- 响应式 - Syjの日常博客"/>
+    <meta name="twitter:description" content="啦啦啦,响应式 设计思路vue2 的响应式处理在了解 vue3 的响应式之前，需要了解下 vue2 是如何实现响应式的：vue2 通过Object.defineProperty API来实现数据的响应式但是,"/>
+    
+    
+    
+    
+    <meta property="og:site_name" content="Syjの日常博客"/>
+    <meta property="og:type" content="object"/>
+    <meta property="og:title" content="Vue3 源码解读 -- 响应式 - Syjの日常博客"/>
+    <meta property="og:description" content="啦啦啦,响应式 设计思路vue2 的响应式处理在了解 vue3 的响应式之前，需要了解下 vue2 是如何实现响应式的：vue2 通过Object.defineProperty API来实现数据的响应式但是,"/>
+    
+<link rel="stylesheet" href="/css/diaspora.css">
+
+<meta name="generator" content="Hexo 6.1.0"></head>
+
+<body class="loading">
+    <span id="config-title" style="display:none">Syjの日常博客</span>
+    <div id="loader"></div>
+    <div id="single">
+    <div id="top" style="display: block;">
+    <div class="bar" style="width: 0;"></div>
+    <a class="iconfont icon-home image-icon" href="javascript:;" data-url="http://example.com"></a>
+    <div title="播放/暂停" class="iconfont icon-play"></div>
+    <h3 class="subtitle">Vue3 源码解读 -- 响应式</h3>
+    <div class="social">
+        <div>
+            <div class="share">
+                <a title="获取二维码" class="iconfont icon-scan" href="javascript:;"></a>
+            </div>
+            <div id="qr"></div>
+        </div>
+    </div>
+    <div class="scrollbar"></div>
+</div>
+
+    <div class="section">
+        <div class="article">
+    <div class='main'>
+        <h1 class="title">Vue3 源码解读 -- 响应式</h1>
+        <div class="stuff">
+            <span>四月 11, 2022</span>
+            
+
+        </div>
+        <div class="content markdown">
+            <h1 id="响应式-设计思路"><a href="#响应式-设计思路" class="headerlink" title="响应式 设计思路"></a>响应式 设计思路</h1><h2 id="vue2-的响应式处理"><a href="#vue2-的响应式处理" class="headerlink" title="vue2 的响应式处理"></a>vue2 的响应式处理</h2><p>在了解 vue3 的响应式之前，需要了解下 vue2 是如何实现响应式的：<br>vue2 通过<code>Object.defineProperty</code> API来实现数据的响应式<br>但是这个API具有以下的缺点：</p>
+<ul>
+<li><strong>不能监听对象属性</strong>新增和删除</li>
+<li>初始化阶段递归执行<code>Object.defineProperty</code><strong>性能负担大</strong></li>
+</ul>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">template</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">div</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">button</span> @<span class="attr">click</span>=<span class="string">&quot;random&quot;</span>&gt;</span>改变 msg 的值<span class="tag">&lt;/<span class="name">button</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">span</span>&gt;</span>&#123;&#123; msg &#125;&#125;<span class="tag">&lt;/<span class="name">span</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">template</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span></span><br><span class="line">  export default &#123;</span><br><span class="line">    created() &#123;</span><br><span class="line">      // 通过生命周期会定义一个数据</span><br><span class="line">      this.msg = &#x27;I&#x27;m creating at created&#x27; </span><br><span class="line">    &#125;,</span><br><span class="line">    methods: &#123;</span><br><span class="line">      random() &#123;</span><br><span class="line">        this.msg = Math.random()</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>问题</strong>：当你执行完上述代码后，你会发现</p>
+<blockquote>
+<p>msg 的值并未发生改变。</p>
+</blockquote>
+<p><strong>解释：</strong></p>
+<blockquote>
+<p>在 created 中定义 this.msg <strong>并不是响应式对象</strong><br>因为在 vue2 中，只有 data 中定义的数据才具有响应式</p>
+</blockquote>
+<h3 id="使用-vue3-改写"><a href="#使用-vue3-改写" class="headerlink" title="使用 vue3 改写"></a>使用 vue3 改写</h3><figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">template</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">div</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">button</span> @<span class="attr">click</span>=<span class="string">&quot;random&quot;</span>&gt;</span>改变 msg 的值<span class="tag">&lt;/<span class="name">button</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">span</span>&gt;</span>&#123;&#123; msg &#125;&#125;<span class="tag">&lt;/<span class="name">span</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">template</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span></span><br><span class="line">  export default &#123;</span><br><span class="line">    setup() &#123;</span><br><span class="line">      const state = reactive(&#123;</span><br><span class="line">        msg: &#x27;I&#x27;m msg&#x27;</span><br><span class="line">      &#125;)</span><br><span class="line">      const random = () =&gt; &#123;</span><br><span class="line">        state.msg = Math.randmon()</span><br><span class="line">      &#125;</span><br><span class="line">      return &#123;</span><br><span class="line">        random,</span><br><span class="line">        ...toRef(state)</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="vue3-的响应式处理"><a href="#vue3-的响应式处理" class="headerlink" title="vue3 的响应式处理"></a>vue3 的响应式处理</h2><p>通过 <code>Proxy</code> API 来劫持 <code>target</code> 对象的 <code>getter</code> 和 <code>setter</code> 来实现响应式</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">因为Proxy劫持的是整个对象，所以它可以检测到任何对 对象 的修改</span><br><span class="line">弥补了 Object.defineProperty 的不足</span><br></pre></td></tr></table></figure>
+
+<p><strong>注意</strong>：</p>
+<blockquote>
+<p>因为 <code>Proxy</code> 劫持的是<strong>当前对象的本身</strong>，所以对于<strong>对象内部还可能存在的对象</strong>，在一开始去实现响应式【<strong>触发 get</strong>】的时候，它（子对象）<strong>并不是响应式</strong>的，需要通过判断当前对象属性是否仍是一个对象，如果是一个对象，则需要还通过<code>递归</code>的方式去重新给子对象设置响应式。</p>
+</blockquote>
+<p>这里用 <code>reactive</code> 的响应式实现代码来演示<br>具体如何实现 get 和 set 操作的可以查看我的 <code>reactive.md</code></p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> user = <span class="title function_">reactive</span>(&#123;</span><br><span class="line">  <span class="attr">age</span>: <span class="number">10</span>,</span><br><span class="line">  <span class="attr">math</span>: &#123;</span><br><span class="line">    <span class="attr">score</span>: <span class="number">88</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;)</span><br><span class="line">user.<span class="property">math</span>.<span class="property">score</span> ++</span><br><span class="line"><span class="comment">// Proxy 的 get 函数中</span></span><br><span class="line">...</span><br><span class="line"><span class="comment">// 先获取用户所需要的值，例如 user.math.score</span></span><br><span class="line"><span class="comment">// target -&gt; user</span></span><br><span class="line"><span class="comment">// age    -&gt; math</span></span><br><span class="line"><span class="comment">// res -&gt; user.math -&gt; isObject -&gt; reactive(user.math) ...</span></span><br><span class="line"><span class="keyword">const</span> res = <span class="title class_">Reflect</span>.<span class="title function_">get</span>(target, key)</span><br><span class="line"><span class="comment">// 判断 res 是否是一个对象</span></span><br><span class="line"><span class="keyword">if</span> (<span class="title function_">isObject</span>(res)) &#123; </span><br><span class="line">  <span class="comment">// 如果是一个对象，则给它继续设置响应式</span></span><br><span class="line">  <span class="keyword">return</span> <span class="title function_">reactive</span>(res)</span><br><span class="line">&#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<h2 id="响应式的实现【简易】"><a href="#响应式的实现【简易】" class="headerlink" title="响应式的实现【简易】"></a>响应式的实现【简易】</h2><p>实现响应式需要分为几个步骤：</p>
+<ul>
+<li>创建 effect</li>
+<li>执行 fn</li>
+<li>触发 get</li>
+<li>执行 track</li>
+<li>把 effect 收集起来作为依赖</li>
+</ul>
+<p>我们先用 <code>jest</code> 来编写我们期望的 <code>effect</code> 函数</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">describe</span>(<span class="string">&#x27;effect&#x27;</span>, <span class="function">() =&gt;</span> &#123;</span><br><span class="line">  <span class="title function_">it</span>(<span class="string">&#x27;happy path&#x27;</span>, <span class="function">() =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">const</span> user = <span class="title function_">reactive</span>(&#123;</span><br><span class="line">      <span class="attr">age</span>: <span class="number">10</span></span><br><span class="line">    &#125;)</span><br><span class="line">    <span class="keyword">let</span> nextAge</span><br><span class="line">    <span class="title function_">effect</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">      nextAge = user.<span class="property">age</span> + <span class="number">1</span></span><br><span class="line">    &#125;)</span><br><span class="line">    <span class="comment">// 当我们第一次写 effect() 的时候默认执行一次，并在 get 操作时将该依赖收集</span></span><br><span class="line">    <span class="title function_">expect</span>(nextAge).<span class="title function_">toBe</span>(<span class="number">11</span>) </span><br><span class="line"></span><br><span class="line">    user.<span class="property">age</span>++</span><br><span class="line">    <span class="comment">// 当函数内部的对象触发了 set 操作后，需要再次调用 effect 的函数</span></span><br><span class="line">    <span class="title function_">expect</span>(nextAge).<span class="title function_">toBe</span>(<span class="number">12</span>) </span><br><span class="line">  &#125;);</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
+
+<p>[依赖收集]</p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// get 操作 =&gt; target =&gt; key =&gt; dep</span></span><br><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment">  结构</span></span><br><span class="line"><span class="comment">  [target]</span></span><br><span class="line"><span class="comment">      -&gt; [key] </span></span><br><span class="line"><span class="comment">            -&gt; [fn()]</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line">  <span class="meta">@params</span></span><br><span class="line">  <span class="attr">target</span>: 当前对象</span><br><span class="line">  <span class="attr">key</span>: 字段</span><br><span class="line">  <span class="attr">dep</span>: 依赖</span><br><span class="line">  ----------第一种情况----------</span><br><span class="line">  <span class="title function_">effect</span>(<span class="keyword">function</span> <span class="title function_">effectFn1</span>(<span class="params"></span>) =&gt; &#123;</span><br><span class="line">    user.<span class="property">age1</span></span><br><span class="line">  &#125;)</span><br><span class="line"> </span><br><span class="line">  <span class="title function_">effect</span>(<span class="keyword">function</span> <span class="title function_">effectFn2</span>(<span class="params"></span>) =&gt; &#123;</span><br><span class="line">    user.<span class="property">age1</span></span><br><span class="line">  &#125;)</span><br><span class="line"> <span class="comment">/*</span></span><br><span class="line"><span class="comment">  [结构]</span></span><br><span class="line"><span class="comment">  user</span></span><br><span class="line"><span class="comment">    -&gt; age1</span></span><br><span class="line"><span class="comment">          -&gt; effectFn1</span></span><br><span class="line"><span class="comment">          -&gt; effectFn2</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line">  ----------第二种情况----------</span><br><span class="line">  <span class="title function_">effect</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">    user.<span class="property">age1</span></span><br><span class="line">    user.<span class="property">age2</span></span><br><span class="line">  &#125;)</span><br><span class="line"> <span class="comment">/*</span></span><br><span class="line"><span class="comment">  [结构]</span></span><br><span class="line"><span class="comment">  user</span></span><br><span class="line"><span class="comment">    -&gt; age1</span></span><br><span class="line"><span class="comment">          -&gt; effect</span></span><br><span class="line"><span class="comment">    -&gt; age2</span></span><br><span class="line"><span class="comment">          -&gt; effect</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line">  ----------第三种情况----------</span><br><span class="line">  <span class="title function_">effect</span>(<span class="keyword">function</span> <span class="title function_">effectFn1</span>(<span class="params"></span>) =&gt; &#123;</span><br><span class="line">    user.<span class="property">age1</span></span><br><span class="line">  &#125;)</span><br><span class="line"> </span><br><span class="line">  <span class="title function_">effect</span>(<span class="keyword">function</span> <span class="title function_">effectFn2</span>(<span class="params"></span>) =&gt; &#123;</span><br><span class="line">    user.<span class="property">age2</span></span><br><span class="line">  &#125;)</span><br><span class="line">  </span><br><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment">  user</span></span><br><span class="line"><span class="comment">    -&gt; age1</span></span><br><span class="line"><span class="comment">          -&gt; effectFn1</span></span><br><span class="line"><span class="comment">    -&gt; age2</span></span><br><span class="line"><span class="comment">          -&gt; effectFn2</span></span><br><span class="line"><span class="comment"> */</span></span><br></pre></td></tr></table></figure>
+
+<p>使用<code>TypeScript</code>来实现功能</p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">createGetter</span>(<span class="params"></span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">Proxy</span>(target, &#123;</span><br><span class="line">    <span class="title function_">get</span>(<span class="params">target, key</span>) &#123;</span><br><span class="line">      <span class="keyword">const</span> res = <span class="title class_">Reflect</span>.<span class="title function_">get</span>(target, key)</span><br><span class="line">      <span class="comment">// 收集依赖</span></span><br><span class="line">      <span class="title function_">track</span>(target,key)</span><br><span class="line">      <span class="keyword">return</span> res</span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="title function_">set</span>(<span class="params">target, key, value</span>) &#123;</span><br><span class="line">      <span class="title class_">Reflect</span>.<span class="title function_">set</span>(target, key, value)</span><br><span class="line">      <span class="comment">// 触发依赖</span></span><br><span class="line">      <span class="title function_">trigger</span>(target, key)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">let</span> activeEffect <span class="comment">// 用来保存当前的函数</span></span><br><span class="line"><span class="keyword">let</span> bucket = <span class="keyword">new</span> <span class="title class_">Map</span>() <span class="comment">// 桶，用来存放所有依赖</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">track</span>(<span class="params">target: <span class="built_in">any</span>, key: <span class="built_in">any</span></span>) &#123;</span><br><span class="line">  <span class="comment">// 先尝试获取 target</span></span><br><span class="line">  <span class="keyword">let</span> targetMap = bucket.<span class="title function_">get</span>(target) </span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (!targetMap) &#123;</span><br><span class="line">     <span class="comment">// 如果没有取到 target，就初始化</span></span><br><span class="line">      bucket.<span class="title function_">set</span>(target, (targetMap = <span class="keyword">new</span> <span class="title class_">Map</span>()))</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 取到了以后，再尝试去获取依赖</span></span><br><span class="line">  <span class="keyword">let</span> depsMap = targetMap.<span class="title function_">get</span>(key)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span>(!depsMap) &#123;</span><br><span class="line">    targetMap.<span class="title function_">set</span>(key, (depsMap = <span class="keyword">new</span> <span class="title class_">Set</span>()))</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 已经获取到了依赖，将他收集起来即可</span></span><br><span class="line">  depsMap.<span class="title function_">add</span>(activeEffect)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">trigger</span>(<span class="params">target, key</span>) &#123;</span><br><span class="line">  <span class="comment">// 触发依赖</span></span><br><span class="line">  <span class="keyword">let</span> targetMap = bucket.<span class="title function_">get</span>(target)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">let</span> depsMap = targetMap.<span class="title function_">get</span>(key)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">for</span>(<span class="keyword">const</span> dep <span class="keyword">of</span> targetMap[key]) &#123;</span><br><span class="line">    <span class="title function_">dep</span>()</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">effect</span>(<span class="params">fn: <span class="built_in">any</span></span>) &#123;</span><br><span class="line">  activeEffect = fn</span><br><span class="line">  <span class="title function_">fn</span>()</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+            <!--[if lt IE 9]><script>document.createElement('audio');</script><![endif]-->
+            <audio id="audio" loop="1" preload="auto" controls="controls" data-autoplay="false">
+                <source type="audio/mpeg" src="">
+            </audio>
+            
+                <ul id="audio-list" style="display:none">
+                    
+                        
+                            <li title="0" data-url="http://link.hhtjim.com/163/425570952.mp3"></li>
+                        
+                    
+                        
+                            <li title="1" data-url="http://link.hhtjim.com/163/425570952.mp3"></li>
+                        
+                    
+                </ul>
+            
+        </div>
+        
+    <div id="gitalk-container" class="comment link"
+		data-enable="true"
+        data-ae="false"
+        data-ci=""
+        data-cs=""
+        data-r=""
+        data-o="kongmingLatern"
+        data-a="kongmingLatern"
+        data-d="false"
+    >查看评论</div>
+
+
+    </div>
+    
+        <div class="side">
+			<ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%93%8D%E5%BA%94%E5%BC%8F-%E8%AE%BE%E8%AE%A1%E6%80%9D%E8%B7%AF"><span class="toc-number">1.</span> <span class="toc-text">响应式 设计思路</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#vue2-%E7%9A%84%E5%93%8D%E5%BA%94%E5%BC%8F%E5%A4%84%E7%90%86"><span class="toc-number">1.1.</span> <span class="toc-text">vue2 的响应式处理</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BD%BF%E7%94%A8-vue3-%E6%94%B9%E5%86%99"><span class="toc-number">1.1.1.</span> <span class="toc-text">使用 vue3 改写</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#vue3-%E7%9A%84%E5%93%8D%E5%BA%94%E5%BC%8F%E5%A4%84%E7%90%86"><span class="toc-number">1.2.</span> <span class="toc-text">vue3 的响应式处理</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%93%8D%E5%BA%94%E5%BC%8F%E7%9A%84%E5%AE%9E%E7%8E%B0%E3%80%90%E7%AE%80%E6%98%93%E3%80%91"><span class="toc-number">1.3.</span> <span class="toc-text">响应式的实现【简易】</span></a></li></ol></li></ol>	
+        </div>
+    
+</div>
+
+
+    </div>
+</div>
+</body>
+
+<script src="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+
+
+<script src="//lib.baomitu.com/jquery/1.8.3/jquery.min.js"></script>
+<script src="/js/plugin.js"></script>
+<script src="/js/typed.js"></script>
+<script src="/js/diaspora.js"></script>
+
+
+<link rel="stylesheet" href="/photoswipe/photoswipe.css">
+<link rel="stylesheet" href="/photoswipe/default-skin/default-skin.css">
+
+
+<script src="/photoswipe/photoswipe.min.js"></script>
+<script src="/photoswipe/photoswipe-ui-default.min.js"></script>
+
+
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+    <!-- Background of PhotoSwipe. 
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+        <!-- Container that holds slides. 
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+            <div class="pswp__top-bar">
+                <!--  Controls are self-explanatory. Order can be changed. -->
+                <div class="pswp__counter"></div>
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+                <!-- Preloader demo http://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div> 
+            </div>
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({"HTML-CSS": { preferredFont: "TeX", availableFonts: ["STIX","TeX"], linebreaks: { automatic:true }, EqnChunk: (MathJax.Hub.Browser.isMobile ? 10 : 50) },
+        tex2jax: { inlineMath: [ ["$", "$"], ["\\(","\\)"] ], processEscapes: true, ignoreClass: "tex2jax_ignore|dno",skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']},
+        TeX: {  noUndefined: { attributes: { mathcolor: "red", mathbackground: "#FFEEEE", mathsize: "90%" } }, Macros: { href: "{}" } },
+        messageStyle: "none"
+    });
+</script>
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+
+
+</html>
